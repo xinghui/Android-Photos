@@ -15,16 +15,89 @@
  */
 package com.xinghui.photos;
 
-import android.os.Bundle;
+import java.util.ArrayList;
+
+import com.xinghui.photos.ui.PhotoFolderGridView;
+import com.xinghui.photos.util.LOG;
+
 import android.app.Activity;
+import android.content.Context;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.Bitmap.Config;
+import android.graphics.BitmapFactory.Options;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import android.os.Vibrator;
+import android.provider.MediaStore;
+import android.util.AttributeSet;
+import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Menu;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.BaseAdapter;
+import android.widget.GridView;
+import android.widget.ImageView;
 
 public class MainActivity extends Activity {
 
+	public static final String KEY_DISMISS_KEYGUARD = "dismiss-keyguard";
+
+	private static final String TAG = "MainActivity";
+
+	private int size = 0;
+	
+	Vibrator vibretor;
+
+	ArrayList<String> result = new ArrayList<String>(0);
+
+	private long[] pattern = { 0, 500, 200, 500 };
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		requestWindowFeature(Window.FEATURE_ACTION_BAR);
+		requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
+
+		if (getIntent().getBooleanExtra(KEY_DISMISS_KEYGUARD, false)) {
+			getWindow().addFlags(
+					WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+		}
+
 		setContentView(R.layout.activity_main);
+
+		result = getImages(this);
+		
+		vibretor  = (Vibrator) this.getSystemService(VIBRATOR_SERVICE);
+
+		PhotoFolderGridView grid = (PhotoFolderGridView) findViewById(R.id.image_grid);
+		grid.setExpanded(true);
+		grid.setAdapter(new ImageAdapter(this));
+		grid.setOnItemClickListener(new OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view,
+					int position, long id) {
+				
+				if(vibretor.hasVibrator()){//Added in API level 11
+					vibretor.cancel();
+					vibretor.vibrate(pattern,-1);
+				}
+			}
+			
+		});
+
+//		DisplayMetrics metrics = new DisplayMetrics();
+//		getWindowManager().getDefaultDisplay().getMetrics(metrics);
+//		int screenWidth = metrics.widthPixels;
+//		int screenHeight = metrics.heightPixels;
+		
+
 	}
 
 	@Override
@@ -34,4 +107,148 @@ public class MainActivity extends Activity {
 		return true;
 	}
 
+	public ArrayList getImages(Context context) {
+
+		String[] projection = { MediaStore.Images.Thumbnails.DATA };
+		final Cursor cursor = context.getContentResolver().query(
+				MediaStore.Images.Thumbnails.EXTERNAL_CONTENT_URI, projection, null,
+				null, null);
+
+		ArrayList<String> result = new ArrayList<String>(cursor.getCount());
+
+		size = cursor.getCount();
+
+		Log.i("xinghui", cursor.getCount() + "");
+
+		if (cursor.moveToFirst()) {
+			final int dataColumn = cursor
+					.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+			do {
+				final String data = cursor.getString(dataColumn);
+				Log.i("xinghui", data);
+				result.add(data);
+			} while (cursor.moveToNext());
+		}
+		cursor.close();
+
+		return result;
+	}
+
+	private class ImageAdapter extends BaseAdapter {
+		public ImageAdapter(Context c) {
+			mContext = c;
+		}
+
+		public int getCount() {
+			return size;
+		}
+
+		public Object getItem(int position) {
+			return position;
+		}
+
+		public long getItemId(int position) {
+			return position;
+		}
+
+		public View getView(int position, View convertView, ViewGroup parent) {
+			SquareImageView imageView;
+			if (convertView == null) {
+				imageView = new SquareImageView(mContext);
+				imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+				imageView.setPadding(8, 8, 8, 8);
+			} else {
+				imageView = (SquareImageView) convertView;
+			}
+
+			Bitmap bitmap = null;
+			String path = result.get(position);
+			
+			bitmap = decodeSampledBitmapFromFile(path, 100, 100);
+			if (bitmap != null) {
+				imageView.setImageBitmap(bitmap);
+			}
+
+			return imageView;
+		}
+
+		private Context mContext;
+
+	}
+	
+	public static Bitmap decodeSampledBitmapFromFile(String pathName, int reqWidth, int reqHeight){
+		final BitmapFactory.Options opts = new BitmapFactory.Options();
+		opts.inJustDecodeBounds = true;
+		BitmapFactory.decodeFile(pathName, opts);
+		
+		opts.inSampleSize = calculateInSampleSize(opts, reqWidth, reqHeight);
+		
+		opts.inJustDecodeBounds = false;
+		return BitmapFactory.decodeFile(pathName, opts);
+	}
+	
+	public static int calculateInSampleSize(
+            BitmapFactory.Options options, int reqWidth, int reqHeight) {
+    // Raw height and width of image
+    final int height = options.outHeight;
+    final int width = options.outWidth;
+    int inSampleSize = 1;
+
+    if (height > reqHeight || width > reqWidth) {
+
+        final int halfHeight = height / 2;
+        final int halfWidth = width / 2;
+
+        // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+        // height and width larger than the requested height and width.
+        while ((halfHeight / inSampleSize) > reqHeight
+                && (halfWidth / inSampleSize) > reqWidth) {
+            inSampleSize *= 2;
+        }
+    }
+
+    LOG.i(TAG, "inSampleSize = " + inSampleSize);
+    return inSampleSize;
+}
+
+	private class SquareImageView extends ImageView {
+		public SquareImageView(Context context) {
+			super(context);
+		}
+
+		public SquareImageView(Context context, AttributeSet attrs) {
+			super(context, attrs);
+		}
+
+		public SquareImageView(Context context, AttributeSet attrs, int defStyle) {
+			super(context, attrs, defStyle);
+		}
+
+		@Override
+		protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//			setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth()); // Snap
+																			// to
+																			// width
+		}
+	}
+
+	
+	private void test(){
+//		long mMaxVmHeap     = Runtime.getRuntime().maxMemory()/1024;
+//		long mMaxNativeHeap = 16*1024;
+//		if (mMaxVmHeap == 16*1024)
+//		     mMaxNativeHeap = 16*1024;
+//		else if (mMaxVmHeap == 24*1024)
+//		     mMaxNativeHeap = 24*1024;
+//		else
+//		    Log.w(TAG, "Unrecognized VM heap size = " + mMaxVmHeap);
+//
+//		long sizeReqd        = bitmapWidth * bitmapHeight * targetBpp  / 8;
+//		long allocNativeHeap = Debug.getNativeHeapAllocatedSize();
+//		if ((sizeReqd + allocNativeHeap + heapPad) >= mMaxNativeHeap)
+//		{
+//		    // Do not call BitmapFactory��
+//		}
+	}
 }
