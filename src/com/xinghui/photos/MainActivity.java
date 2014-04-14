@@ -17,33 +17,27 @@ package com.xinghui.photos;
 
 import java.util.ArrayList;
 
-import com.xinghui.photos.ui.PhotoFolderGridView;
-import com.xinghui.photos.util.LOG;
-
 import android.app.Activity;
 import android.content.Context;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.Bitmap.Config;
-import android.graphics.BitmapFactory.Options;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
-import android.widget.GridView;
 import android.widget.ImageView;
+
+import com.xinghui.photos.ui.BitmapWorkerTask;
+import com.xinghui.photos.ui.PhotoFolderGridView;
 
 public class MainActivity extends Activity {
 
@@ -77,7 +71,7 @@ public class MainActivity extends Activity {
 		vibretor  = (Vibrator) this.getSystemService(VIBRATOR_SERVICE);
 
 		PhotoFolderGridView grid = (PhotoFolderGridView) findViewById(R.id.image_grid);
-		grid.setExpanded(true);
+		grid.setExpanded(false);
 		grid.setAdapter(new ImageAdapter(this));
 		grid.setOnItemClickListener(new OnItemClickListener() {
 			@Override
@@ -109,7 +103,7 @@ public class MainActivity extends Activity {
 
 	public ArrayList getImages(Context context) {
 
-		String[] projection = { MediaStore.Images.Thumbnails.DATA };
+		String[] projection = { MediaStore.Images.Media.DATA };//Media
 		final Cursor cursor = context.getContentResolver().query(
 				MediaStore.Images.Thumbnails.EXTERNAL_CONTENT_URI, projection, null,
 				null, null);
@@ -161,13 +155,18 @@ public class MainActivity extends Activity {
 				imageView = (SquareImageView) convertView;
 			}
 
-			Bitmap bitmap = null;
 			String path = result.get(position);
 			
-			bitmap = decodeSampledBitmapFromFile(path, 100, 100);
-			if (bitmap != null) {
-				imageView.setImageBitmap(bitmap);
-			}
+//			BitmapWorkerTask task = new BitmapWorkerTask(imageView);
+//			task.execute(path);
+//			BitmapWorkerTask.loadBitmap(path, imageView,BitmapFactory.decodeResource(getResources(), R.drawable.ic_launcher));
+			BitmapWorkerTask.loadBitmap(path, imageView,BitmapWorkerTask.decodeSampledBitmapFromFile(path, 1, 1));
+			
+//			Bitmap bitmap = null;
+//			bitmap = decodeSampledBitmapFromFile(path, 100, 100);
+//			if (bitmap != null) {
+//				imageView.setImageBitmap(bitmap);
+//			}
 
 			return imageView;
 		}
@@ -175,41 +174,7 @@ public class MainActivity extends Activity {
 		private Context mContext;
 
 	}
-	
-	public static Bitmap decodeSampledBitmapFromFile(String pathName, int reqWidth, int reqHeight){
-		final BitmapFactory.Options opts = new BitmapFactory.Options();
-		opts.inJustDecodeBounds = true;
-		BitmapFactory.decodeFile(pathName, opts);
-		
-		opts.inSampleSize = calculateInSampleSize(opts, reqWidth, reqHeight);
-		
-		opts.inJustDecodeBounds = false;
-		return BitmapFactory.decodeFile(pathName, opts);
-	}
-	
-	public static int calculateInSampleSize(
-            BitmapFactory.Options options, int reqWidth, int reqHeight) {
-    // Raw height and width of image
-    final int height = options.outHeight;
-    final int width = options.outWidth;
-    int inSampleSize = 1;
 
-    if (height > reqHeight || width > reqWidth) {
-
-        final int halfHeight = height / 2;
-        final int halfWidth = width / 2;
-
-        // Calculate the largest inSampleSize value that is a power of 2 and keeps both
-        // height and width larger than the requested height and width.
-        while ((halfHeight / inSampleSize) > reqHeight
-                && (halfWidth / inSampleSize) > reqWidth) {
-            inSampleSize *= 2;
-        }
-    }
-
-    LOG.i(TAG, "inSampleSize = " + inSampleSize);
-    return inSampleSize;
-}
 
 	private class SquareImageView extends ImageView {
 		public SquareImageView(Context context) {
@@ -227,9 +192,7 @@ public class MainActivity extends Activity {
 		@Override
 		protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-//			setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth()); // Snap
-																			// to
-																			// width
+			setMeasuredDimension(getMeasuredWidth(), getMeasuredWidth()); 
 		}
 	}
 
@@ -251,4 +214,5 @@ public class MainActivity extends Activity {
 //		    // Do not call BitmapFactory��
 //		}
 	}
+	
 }
